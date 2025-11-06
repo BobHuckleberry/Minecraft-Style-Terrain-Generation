@@ -7,15 +7,15 @@ public class VoxelTerrain : MonoBehaviour
 {
     public int chunksX = 4;
     public int chunksZ = 4;
-    public int size = 16;           // voxels per axis in a chunk
+    public int size = 16;          
     public float voxelScale = 1f;
     public float heightScale = 20f;
     public float noiseScale = 0.08f;
     public int seed = 1337;
-    public Material chunkMaterial;   // assign in Inspector
+    public Material chunkMaterial;   
     public int renderDistanceInChunks = 4;  
 
-    public float updateInterval = 0.5f; // seconds between chunk updates
+    public float updateInterval = 0.5f;
 
     public Transform playerTransform;
 
