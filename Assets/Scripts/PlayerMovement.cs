@@ -22,7 +22,7 @@ public class Player : MonoBehaviour
     public Transform playerCamera;
 
     [Header("Crouch Settings")]
-    public float crouchScale = 0.5f; // Scale for the Y-axis when crouching
+    public float crouchScale = 0.5f;
     public float crouchTransitionSpeed = 5f;
 
     [Header("Ground Check")]

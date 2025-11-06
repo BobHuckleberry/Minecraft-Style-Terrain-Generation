@@ -2,41 +2,33 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Simple mesher: emits one quad per exposed voxel face (no greedy merging).
-/// Straightforward and easy to debug; acceptable for small worlds / prototypes.
+/// Makes a mesh by adding a quad for every visible voxel face.
+/// Easy to understand, good for testing or small maps.
 /// </summary>
 public static class SimpleMesher
 {
-    // For each face we provide vertex offsets (in voxel coords, 4 corners).
-    // Order is chosen for consistent winding (clockwise when looking at the face).
+    // Directions for each face (+Z, -Z, +Y, -Y, +X, -X)
     static readonly Vector3Int[] faceDirs = {
-        new Vector3Int(0, 0, 1),  // +Z (forward)
-        new Vector3Int(0, 0, -1), // -Z (back)
-        new Vector3Int(0, 1, 0),  // +Y (up)
-        new Vector3Int(0, -1, 0), // -Y (down)
-        new Vector3Int(1, 0, 0),  // +X (right)
-        new Vector3Int(-1, 0, 0)  // -X (left)
+        new Vector3Int(0, 0, 1),
+        new Vector3Int(0, 0, -1),
+        new Vector3Int(0, 1, 0),
+        new Vector3Int(0, -1, 0),
+        new Vector3Int(1, 0, 0),
+        new Vector3Int(-1, 0, 0)
     };
 
-    // For each face (same order as faceDirs) the four corner offsets (relative to voxel origin).
-    // Voxel origin is the minimum corner (x,y,z) of that voxel.
+    // Corner points for each face
     static readonly Vector3[,] faceCorners = new Vector3[6,4]
     {
-        // +Z face (front)
-        { new Vector3(0,0,1), new Vector3(1,0,1), new Vector3(1,1,1), new Vector3(0,1,1) },
-        // -Z face (back)
-        { new Vector3(1,0,0), new Vector3(0,0,0), new Vector3(0,1,0), new Vector3(1,1,0) },
-        // +Y face (top)
-        { new Vector3(0,1,1), new Vector3(1,1,1), new Vector3(1,1,0), new Vector3(0,1,0) },
-        // -Y face (bottom)
-        { new Vector3(0,0,0), new Vector3(1,0,0), new Vector3(1,0,1), new Vector3(0,0,1) },
-        // +X face (right)
-        { new Vector3(1,0,1), new Vector3(1,0,0), new Vector3(1,1,0), new Vector3(1,1,1) },
-        // -X face (left)
-        { new Vector3(0,0,0), new Vector3(0,0,1), new Vector3(0,1,1), new Vector3(0,1,0) }
+        { new Vector3(0,0,1), new Vector3(1,0,1), new Vector3(1,1,1), new Vector3(0,1,1) }, // +Z
+        { new Vector3(1,0,0), new Vector3(0,0,0), new Vector3(0,1,0), new Vector3(1,1,0) }, // -Z
+        { new Vector3(0,1,1), new Vector3(1,1,1), new Vector3(1,1,0), new Vector3(0,1,0) }, // +Y
+        { new Vector3(0,0,0), new Vector3(1,0,0), new Vector3(1,0,1), new Vector3(0,0,1) }, // -Y
+        { new Vector3(1,0,1), new Vector3(1,0,0), new Vector3(1,1,0), new Vector3(1,1,1) }, // +X
+        { new Vector3(0,0,0), new Vector3(0,0,1), new Vector3(0,1,1), new Vector3(0,1,0) }  // -X
     };
 
-    // Normals for faces in same order
+    // Normal direction for each face
     static readonly Vector3[] faceNormals = {
         Vector3.forward,
         Vector3.back,
@@ -46,7 +38,7 @@ public static class SimpleMesher
         Vector3.left
     };
 
-    // Simple UVs for a full-face square (0..1)
+    // UVs for one square
     static readonly Vector2[] quadUVs = {
         new Vector2(0,0),
         new Vector2(1,0),
@@ -65,18 +57,19 @@ public static class SimpleMesher
         List<Vector3> normals = new List<Vector3>();
         List<Vector2> uvs = new List<Vector2>();
 
-        // helper to check bounds
+        // Checks if voxel is inside array
         bool InBounds(int x, int y, int z) => x >= 0 && x < sx && y >= 0 && y < sy && z >= 0 && z < sz;
 
+        // Go through all voxels
         for (int x = 0; x < sx; x++)
         {
             for (int y = 0; y < sy; y++)
             {
                 for (int z = 0; z < sz; z++)
                 {
-                    if (!voxels[x,y,z]) continue; // skip air
+                    if (!voxels[x,y,z]) continue; // skip empty blocks
 
-                    // for each of the 6 directions, if neighbor is empty/outside, emit that face
+                    // Check all 6 faces
                     for (int f = 0; f < 6; f++)
                     {
                         Vector3Int d = faceDirs[f];
@@ -85,9 +78,9 @@ public static class SimpleMesher
                         int nz = z + d.z;
 
                         bool neighborSolid = InBounds(nx, ny, nz) && voxels[nx, ny, nz];
-                        if (neighborSolid) continue; // face hidden
+                        if (neighborSolid) continue; // hidden face
 
-                        // add face
+                        // Add one quad
                         int baseIndex = verts.Count;
                         for (int i = 0; i < 4; i++)
                         {
@@ -98,11 +91,10 @@ public static class SimpleMesher
                             uvs.Add(quadUVs[i]);
                         }
 
-                        // two triangles (0,1,2) and (0,2,3)
+                        // Two triangles
                         tris.Add(baseIndex + 0);
                         tris.Add(baseIndex + 1);
                         tris.Add(baseIndex + 2);
-
                         tris.Add(baseIndex + 0);
                         tris.Add(baseIndex + 2);
                         tris.Add(baseIndex + 3);
@@ -111,15 +103,14 @@ public static class SimpleMesher
             }
         }
 
+        // Build mesh
         Mesh mesh = new Mesh();
-        // if mesh potentially large:
         if (verts.Count > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         mesh.SetVertices(verts);
         mesh.SetTriangles(tris, 0);
         mesh.SetNormals(normals);
         mesh.SetUVs(0, uvs);
         mesh.RecalculateBounds();
-        // RecalculateNormals() not needed because we provided normals.
         return mesh;
     }
 }

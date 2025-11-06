@@ -32,6 +32,7 @@ public class VoxelTerrain : MonoBehaviour
 
         Random.InitState(seed);
         updateWait = new WaitForSeconds(updateInterval);
+
         StartCoroutine(WorldUpdateLoop());
     }
     IEnumerator WorldUpdateLoop()
@@ -61,13 +62,13 @@ public class VoxelTerrain : MonoBehaviour
             {
                 Vector2Int coord = new Vector2Int(playerChunkX + dx, playerChunkZ + dz);
 
-                // optional: skip if outside a circular radius (euclidean)
+                
                 if (dx*dx + dz*dz > renderDistanceInChunks * renderDistanceInChunks) continue;
 
                 desired.Add(coord);
                 if (!chunks.ContainsKey(coord))
                 {
-                    // spawn chunk (can be coroutine/task if generation heavy)
+                    // spawn chunk at coord
                     StartCoroutine(SpawnChunk(coord));
                 }
             }
@@ -76,18 +77,18 @@ public class VoxelTerrain : MonoBehaviour
 
     IEnumerator SpawnChunk(Vector2Int coord)
     {
-        // 1) start CPU voxel generation on a background thread
+        // start generation on a background thread
         Task<bool[,,]> genTask = Task.Run(() =>
             Chunk.GenerateVoxelArray(size, noiseScale, heightScale, seed, coord.x, coord.y)
         );
 
-        // you can yield until the task completes (non-blocking)
+        // yeild until task is completed
         while (!genTask.IsCompleted)
             yield return null;
 
-        bool[,,] voxelData = genTask.Result; // now on main thread
+        bool[,,] voxelData = genTask.Result; // on main thread
 
-        // 2) create GameObject and chunk component on main thread
+        // create GameObject and chunk component on main thread
         var go = new GameObject($"Chunk_{coord.x}_{coord.y}");
         go.transform.position = new Vector3(coord.x * size, 0, coord.y * size);
         go.transform.parent = transform;
@@ -97,13 +98,13 @@ public class VoxelTerrain : MonoBehaviour
 
         var chunkComponent = go.AddComponent<Chunk>();
 
-        // 3) init Unity-side fields and assign material
+        // init Unity side fields and assign material
         chunkComponent.Init(size, voxelScale, chunkMaterial, coord.x, coord.y);
 
-        // 4) set voxel data (already computed)
+        // set voxel data
         chunkComponent.SetVoxelData(voxelData);
 
-        // 5) build/assign mesh & collider (main thread, quick)
+        // build/assign mesh and collider
         chunkComponent.BuildMeshFromVoxelData();
 
         chunks[coord] = chunkComponent;
@@ -115,7 +116,7 @@ public class VoxelTerrain : MonoBehaviour
     {
         GameObject chunkGO = new GameObject($"Chunk_{coord.x}_{coord.y}");
         chunkGO.transform.position = new Vector3(coord.x * size, 0, coord.y * size);
-        // add MeshFilter/MeshRenderer etc. and build mesh from data
+        // add MeshFilter/MeshRenderer and build mesh from data
         var mf = chunkGO.AddComponent<MeshFilter>();
         var mr = chunkGO.AddComponent<MeshRenderer>();
         //mf.mesh = BuildMeshFromData(data); // create mesh on main thread
